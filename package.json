@@ -1,0 +1,120 @@
+{
+  "name": "kevin-log",
+  "displayName": "kevin-log",
+  "description": "log your variables with ease",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.107.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "scripts": {
+    "vscode:prepublish": "yarn run package",
+    "compile": "webpack",
+    "watch": "webpack --watch",
+    "package": "webpack --mode production --devtool hidden-source-map",
+    "compile-tests": "tsc -p . --outDir out",
+    "watch-tests": "tsc -p . -w --outDir out",
+    "pretest": "yarn run compile-tests && yarn run compile && yarn run lint",
+    "lint": "eslint src",
+    "test": "vscode-test",
+    "test:unit": "tsc -p ./tsconfig.json --outDir out && mocha --ui tdd \"out/**/logPlanner.test.js\"",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "vsce publish"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.31.1",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "24.x",
+    "@types/vscode": "1.107.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.0.0",
+    "eslint": "^10.5.0",
+    "mocha": "^11.7.6",
+    "ts-loader": "^9.6.2",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.61.1",
+    "webpack": "^5.107.2",
+    "webpack-cli": "^7.0.3"
+  },
+  "overrides": {
+    "diff": "^8.0.4",
+    "serialize-javascript": "^7.0.6"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "kevinLog.insertLog",
+        "title": "Kevin Log: Insert Console Log"
+      },
+      {
+        "command": "kevinLog.deleteAllLogs",
+        "title": "Kevin Log: Delete All Logs"
+      },
+      {
+        "command": "kevinLog.commentAllLogs",
+        "title": "Kevin Log: Comment/Uncomment All Logs"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "kevinLog.insertLog",
+        "key": "ctrl+alt+l",
+        "mac": "cmd+alt+l",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "kevinLog.deleteAllLogs",
+        "key": "ctrl+alt+shift+d",
+        "mac": "cmd+alt+shift+d",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "kevinLog.commentAllLogs",
+        "key": "ctrl+alt+shift+c",
+        "mac": "cmd+alt+shift+c",
+        "when": "editorTextFocus"
+      }
+    ],
+    "configuration": {
+      "title": "Kevin Log",
+      "properties": {
+        "kevinLog.quoteStyle": {
+          "type": "string",
+          "enum": [
+            "'",
+            "\"",
+            "`"
+          ],
+          "default": "'",
+          "description": "Quote character used to wrap the log message."
+        },
+        "kevinLog.logFunction": {
+          "type": "string",
+          "default": "console.log",
+          "description": "The function used to log, e.g. console.log, console.debug, console.info, or a custom logger like myLogger.log."
+        },
+        "kevinLog.includeFileAndLine": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include the file name and line number in the log message."
+        },
+        "kevinLog.includeMarker": {
+          "type": "boolean",
+          "default": true,
+          "description": "Prefix log messages with a 🚀 marker, used to identify and later delete/comment all inserted logs."
+        },
+        "kevinLog.semicolons": {
+          "type": "boolean",
+          "default": true,
+          "description": "Add a trailing semicolon to inserted log statements."
+        }
+      }
+    }
+  },
+  "packageManager": "yarn@4.6.0+sha512.5383cc12567a95f1d668fbe762dfe0075c595b4bfff433be478dbbe24e05251a8e8c3eb992a986667c1d53b6c3a9c85b8398c35a960587fbd9fa3a0915406728"
+}
