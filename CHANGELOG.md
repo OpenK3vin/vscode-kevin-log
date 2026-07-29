@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.1
+
+### Patch Changes
+
+- 3dc137a: Added an OSS project setup checklist to the documentation and refined the release script to improve the Open VSX publishing flow and debug output.
+- c57bfc2: Added a GitHub Actions workflow to automatically sync the `main` branch into the `dev` branch after every release or push.
+
 ## 0.1.0
 
 ### Minor Changes
