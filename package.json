@@ -31,10 +31,14 @@
     "test:unit": "tsc -p ./tsconfig.json --outDir out && mocha --ui tdd \"out/**/logPlanner.test.js\"",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "yarn vsce package --no-dependencies && yarn ovsx publish kevin-log-$(node -p \"require('./package.json').version\").vsix -p \"$OVSX_PAT\""
+    "release": "yarn vsce package --no-dependencies && yarn ovsx publish kevin-log-$(node -p \"require('./package.json').version\").vsix -p \"$OVSX_PAT\"",
+    "compile-code": "repomix -o kevin-log-codebase.xml"
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
+    "@secretlint/secretlint-formatter-sarif": "^13.0.4",
+    "@secretlint/secretlint-rule-no-dotenv": "^13.0.4",
+    "@secretlint/secretlint-rule-preset-recommend": "^13.0.4",
     "@types/mocha": "^10.0.10",
     "@types/node": "24.x",
     "@types/vscode": "1.107.0",
