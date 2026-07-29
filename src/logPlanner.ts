@@ -1,7 +1,8 @@
 import * as path from "path";
 import * as ts from "typescript";
 
-export const MARKER = "🚀";
+/** Fallback marker used when no user-configured marker is supplied. */
+export const DEFAULT_MARKER = "🚀";
 
 /** Describes what to log and where, expressed in plain line/character terms. */
 export interface LogPlan {
@@ -20,6 +21,8 @@ export interface FormatOptions {
   logFunction?: string; // e.g. "console.log"
   includeFileAndLine?: boolean;
   includeMarker?: boolean;
+  /** Marker string prefixed to log messages, e.g. "🚀" or "DEBUG:". Defaults to DEFAULT_MARKER. */
+  marker?: string;
   semicolons?: boolean;
   /** Indent string to prefix the generated line with (caller determines this from surrounding code). */
   indent?: string;
@@ -352,13 +355,14 @@ export function formatLogStatement(
   const logFn = options.logFunction ?? "console.log";
   const includeFileLine = options.includeFileAndLine ?? true;
   const includeMarker = options.includeMarker ?? true;
+  const marker = options.marker ?? DEFAULT_MARKER;
   const semi = (options.semicolons ?? true) ? ";" : "";
   const indent = options.indent ?? "";
 
   const baseName = path.basename(fileName);
 
   const parts: string[] = [];
-  if (includeMarker) parts.push(MARKER);
+  if (includeMarker) parts.push(marker);
   if (includeFileLine) parts.push(`${baseName}:${plan.logLineNumber}`);
   if (plan.contextName) parts.push(plan.contextName);
   parts.push(...plan.expressions.map((e) => `${e}:`));
@@ -372,12 +376,23 @@ export function formatLogStatement(
   return `${indent}${logFn}(${quote}${label}${quote}, ${args})${semi}\n`;
 }
 
-/** Find all 0-indexed line numbers in the source that contain the marker. */
-export function findMarkedLogLines(sourceText: string): number[] {
+/**
+ * Find all 0-indexed line numbers in the source that contain a marker.
+ * Accepts one marker or a list (so logs inserted under a previous
+ * `kevinLog.marker` setting are still found after the user changes it).
+ * Defaults to DEFAULT_MARKER for backwards compatibility.
+ */
+export function findMarkedLogLines(
+  sourceText: string,
+  markers: string | string[] = DEFAULT_MARKER,
+): number[] {
+  const markerList = Array.isArray(markers) ? markers : [markers];
   const lines = sourceText.split(/\r\n|\r|\n/);
   const result: number[] = [];
   lines.forEach((line, i) => {
-    if (line.includes(MARKER)) result.push(i);
+    if (markerList.some((m) => m.length > 0 && line.includes(m))) {
+      result.push(i);
+    }
   });
   return result;
 }

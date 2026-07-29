@@ -1,9 +1,10 @@
 import * as assert from "assert";
+import { suite, test } from "mocha";
 import {
   buildLogPlan,
   formatLogStatement,
   findMarkedLogLines,
-  MARKER,
+  DEFAULT_MARKER,
 } from "../logPlanner";
 
 /** Find the offset of the given needle's first character in source. Throws if not found. */
@@ -207,7 +208,7 @@ suite("logPlanner: formatLogStatement", () => {
     const result = formatLogStatement(basePlan, "test.ts");
     assert.strictEqual(
       result,
-      `console.log('${MARKER} ~ test.ts:4 ~ calculateTotal ~ total:', total);\n`,
+      `console.log('${DEFAULT_MARKER} ~ test.ts:4 ~ calculateTotal ~ total:', total);\n`,
     );
   });
 
@@ -322,7 +323,7 @@ suite("logPlanner: findMarkedLogLines", () => {
   test("finds a single marked line", () => {
     const source = [
       "const x = 1;",
-      `console.log('${MARKER} test.ts:2 ~ x:', x);`,
+      `console.log('${DEFAULT_MARKER} test.ts:2 ~ x:', x);`,
       "const y = 2;",
     ].join("\n");
     assert.deepStrictEqual(findMarkedLogLines(source), [1]);
@@ -330,15 +331,90 @@ suite("logPlanner: findMarkedLogLines", () => {
 
   test("finds multiple marked lines, ignoring unmarked console.log calls", () => {
     const source = [
-      `console.log('${MARKER} a:', a);`,
+      `console.log('${DEFAULT_MARKER} a:', a);`,
       "console.log('manual log, no marker');",
-      `console.log('${MARKER} b:', b);`,
+      `console.log('${DEFAULT_MARKER} b:', b);`,
     ].join("\n");
     assert.deepStrictEqual(findMarkedLogLines(source), [0, 2]);
   });
 
   test("handles CRLF line endings", () => {
-    const source = `const x = 1;\r\nconsole.log('${MARKER} x:', x);\r\nconst y = 2;`;
+    const source = `const x = 1;\r\nconsole.log('${DEFAULT_MARKER} x:', x);\r\nconst y = 2;`;
     assert.deepStrictEqual(findMarkedLogLines(source), [1]);
+  });
+
+  test("finds lines using a custom marker instead of the default", () => {
+    const source = [
+      "const x = 1;",
+      "console.log('🐛 test.ts:2 ~ x:', x);",
+      "const y = 2;",
+    ].join("\n");
+    assert.deepStrictEqual(findMarkedLogLines(source, "🐛"), [1]);
+  });
+
+  test("does not find a custom-marker line when searching for the default marker only", () => {
+    const source = [
+      "const x = 1;",
+      "console.log('🐛 test.ts:2 ~ x:', x);",
+    ].join("\n");
+    assert.deepStrictEqual(findMarkedLogLines(source), []);
+  });
+
+  test("finds lines matching any marker when given a list (old + new marker after a settings change)", () => {
+    const source = [
+      `console.log('${DEFAULT_MARKER} a:', a);`, // inserted before the setting changed
+      "console.log('🐛 b:', b);", // inserted after the setting changed
+      "console.log('manual log, no marker');",
+    ].join("\n");
+    assert.deepStrictEqual(
+      findMarkedLogLines(source, ["🐛", DEFAULT_MARKER]),
+      [0, 1],
+    );
+  });
+});
+
+suite("logPlanner: formatLogStatement marker option", () => {
+  test("uses DEFAULT_MARKER when no marker option is provided", () => {
+    const plan = {
+      expressions: ["x"],
+      insertLine: 0,
+      logLineNumber: 1,
+    };
+    const result = formatLogStatement(plan, "test.ts");
+    assert.ok(result.includes(DEFAULT_MARKER));
+  });
+
+  test("uses a custom marker string when provided", () => {
+    const plan = {
+      expressions: ["x"],
+      insertLine: 0,
+      logLineNumber: 1,
+    };
+    const result = formatLogStatement(plan, "test.ts", { marker: "🐛" });
+    assert.ok(result.includes("🐛"));
+    assert.ok(!result.includes(DEFAULT_MARKER));
+  });
+
+  test("supports a non-emoji text marker", () => {
+    const plan = {
+      expressions: ["x"],
+      insertLine: 0,
+      logLineNumber: 1,
+    };
+    const result = formatLogStatement(plan, "test.ts", { marker: "DEBUG:" });
+    assert.ok(result.includes("DEBUG:"));
+  });
+
+  test("omits the marker entirely when includeMarker is false, regardless of marker option", () => {
+    const plan = {
+      expressions: ["x"],
+      insertLine: 0,
+      logLineNumber: 1,
+    };
+    const result = formatLogStatement(plan, "test.ts", {
+      marker: "🐛",
+      includeMarker: false,
+    });
+    assert.ok(!result.includes("🐛"));
   });
 });
