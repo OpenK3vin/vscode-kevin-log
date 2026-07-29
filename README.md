@@ -84,13 +84,27 @@ class UserService {
 
 Configure under `Settings → Extensions → Kevin Log`, or in `settings.json`:
 
-| Setting                       | Default       | Description                                                       |
-| ----------------------------- | ------------- | ----------------------------------------------------------------- |
-| `kevinLog.quoteStyle`         | `'`           | Quote character: `'`, `"`, or `` ` ``                             |
-| `kevinLog.logFunction`        | `console.log` | The function used to log, e.g. `console.debug` or a custom logger |
-| `kevinLog.includeFileAndLine` | `true`        | Include the file name and line number                             |
-| `kevinLog.includeMarker`      | `true`        | Prefix logs with 🚀 (needed for Delete/Comment All to find them)  |
-| `kevinLog.semicolons`         | `true`        | Add a trailing semicolon                                          |
+| Setting                       | Default       | Description                                                            |
+| ----------------------------- | ------------- | ---------------------------------------------------------------------- |
+| `kevinLog.quoteStyle`         | `'`           | Quote character: `'`, `"`, or `` ` ``                                  |
+| `kevinLog.logFunction`        | `console.log` | The function used to log, e.g. `console.debug` or a custom logger      |
+| `kevinLog.includeFileAndLine` | `true`        | Include the file name and line number                                  |
+| `kevinLog.includeMarker`      | `true`        | Prefix logs with a marker (needed for Delete/Comment All to find them) |
+| `kevinLog.marker`             | `🚀`          | Custom marker string used to identify logs                             |
+| `kevinLog.semicolons`         | `true`        | Add a trailing semicolon                                               |
+
+**Example `settings.json`:**
+
+```json
+{
+  "kevinLog.quoteStyle": "'",
+  "kevinLog.logFunction": "console.log",
+  "kevinLog.includeFileAndLine": true,
+  "kevinLog.includeMarker": true,
+  "kevinLog.marker": "🚀",
+  "kevinLog.semicolons": true
+}
+```
 
 ## Why
 

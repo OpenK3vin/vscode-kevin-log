@@ -119,7 +119,12 @@
         "kevinLog.includeMarker": {
           "type": "boolean",
           "default": true,
-          "description": "Prefix log messages with a 🚀 marker, used to identify and later delete/comment all inserted logs."
+          "description": "Prefix log messages with a marker, used to identify and later delete/comment all inserted logs."
+        },
+        "kevinLog.marker": {
+          "type": "string",
+          "default": "🚀",
+          "description": "Marker string prefixed to log messages, used to identify and later delete/comment all inserted logs."
         },
         "kevinLog.semicolons": {
           "type": "boolean",
