@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
+      - name: Debug secret presence (length only, never the value)
+        run: |
+          echo "OVSX_PAT length: ${#OVSX_PAT}"
+        env:
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+
       - name: Create Version PR or Publish
         id: changesets
         uses: changesets/action@v1
