@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, dev]
+  push:
+    branches: [dev]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable Corepack (Yarn Berry)
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint
+
+      - name: Compile (webpack)
+        run: yarn compile
+
+      - name: Unit tests
+        run: yarn test:unit
+
+  changeset-check:
+    if: >
+      github.event_name == 'pull_request' &&
+      github.base_ref == 'dev' &&
+      !contains(github.event.pull_request.labels.*.name, 'skip-changeset')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Ensure a changeset was added
+        run: |
+          git fetch origin ${{ github.base_ref }} --depth=1
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" -- .changeset | grep -v 'README.md' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No changeset file found in .changeset/."
+            echo "Run 'yarn changeset', commit the generated file, and push again."
+            echo "(If this PR genuinely needs no version bump — e.g. docs/CI only — add the 'skip-changeset' label to bypass this check.)"
+            exit 1
+          fi
+          echo "Changeset(s) found:"
+          echo "$CHANGED"
