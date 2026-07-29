@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.0
+
+### Minor Changes
+
+- 1aca080: Added GitHub Actions workflows for continuous integration, automated releases, and Open VSX Registry publishing support.
+
 All notable changes to the "Kevin Log" extension will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
