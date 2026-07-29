@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.2
+
+### Patch Changes
+
+- c4204be: Fixed `vsce` PnP resolution errors during publishing by adding `secretlint` dependencies, and introduced a `compile-code` script for extracting codebase context.
+
 ## 0.1.1
 
 ### Patch Changes
