@@ -31,7 +31,7 @@
     "test:unit": "tsc -p ./tsconfig.json --outDir out && mocha --ui tdd \"out/**/logPlanner.test.js\"",
     "changeset": "changeset",
     "version": "changeset version",
-    "release": "npx vsce package --no-dependencies && npx vsce publish --packagePath kevin-log-$(node -p \"require('./package.json').version\").vsix -p $VSCE_PAT && npx ovsx publish kevin-log-$(node -p \"require('./package.json').version\").vsix -p $OVSX_PAT"
+    "release": "yarn vsce package --no-dependencies && yarn ovsx publish kevin-log-$(node -p \"require('./package.json').version\").vsix -p \"$OVSX_PAT\""
   },
   "devDependencies": {
     "@changesets/cli": "^2.31.1",
