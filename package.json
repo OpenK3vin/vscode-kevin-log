@@ -3,6 +3,9 @@
   "displayName": "kevin-log",
   "description": "log your variables with ease",
   "version": "0.0.1",
+  "publisher": "open-k3vin",
+  "icon": "public/logo.png",
+  "license": "MIT",
   "engines": {
     "vscode": "^1.107.0"
   },
@@ -11,6 +14,10 @@
   ],
   "activationEvents": [],
   "main": "./dist/extension.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/OpenK3vin/vscode-kevin-log.git"
+  },
   "scripts": {
     "vscode:prepublish": "yarn run package",
     "compile": "webpack",
@@ -33,6 +40,7 @@
     "@types/vscode": "1.107.0",
     "@vscode/test-cli": "^0.0.15",
     "@vscode/test-electron": "^3.0.0",
+    "@vscode/vsce": "^3.9.2",
     "eslint": "^10.5.0",
     "mocha": "^11.7.6",
     "ts-loader": "^9.6.2",
