@@ -1,7 +1,15 @@
 out
 dist
 node_modules
+
 .vscode-test/
 *.vsix
+
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
 
 *-codebase.xml

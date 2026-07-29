@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import {
-  MARKER,
+  DEFAULT_MARKER,
   buildLogPlan,
   formatLogStatement,
   findMarkedLogLines,
@@ -64,6 +64,7 @@ function insertLogCommand() {
     logFunction: config.get<string>("logFunction", "console.log"),
     includeFileAndLine: config.get<boolean>("includeFileAndLine", true),
     includeMarker: config.get<boolean>("includeMarker", true),
+    marker: config.get<string>("marker", DEFAULT_MARKER),
     semicolons: config.get<boolean>("semicolons", true),
     indent,
   });
@@ -93,7 +94,12 @@ function deleteAllLogsCommand() {
   if (!editor) return;
 
   const document = editor.document;
-  const linesToDelete = findMarkedLogLines(document.getText());
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+  const linesToDelete = findMarkedLogLines(document.getText(), [
+    marker,
+    DEFAULT_MARKER,
+  ]);
 
   if (linesToDelete.length === 0) {
     vscode.window.showInformationMessage(
@@ -119,7 +125,12 @@ function commentAllLogsCommand() {
   if (!editor) return;
 
   const document = editor.document;
-  const lineNumbers = findMarkedLogLines(document.getText());
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+  const lineNumbers = findMarkedLogLines(document.getText(), [
+    marker,
+    DEFAULT_MARKER,
+  ]);
 
   if (lineNumbers.length === 0) {
     vscode.window.showInformationMessage(
