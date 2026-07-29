@@ -28,6 +28,9 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "./",\
         "packageDependencies": [\
           ["@changesets/cli", "npm:2.31.1"],\
+          ["@secretlint/secretlint-formatter-sarif", "npm:13.0.4"],\
+          ["@secretlint/secretlint-rule-no-dotenv", "npm:13.0.4"],\
+          ["@secretlint/secretlint-rule-preset-recommend", "npm:13.0.4"],\
           ["@types/mocha", "npm:10.0.10"],\
           ["@types/node", "npm:24.13.3"],\
           ["@types/vscode", "npm:1.107.0"],\
@@ -1111,6 +1114,14 @@ const RAW_RUNTIME_STATE =
           ["node-sarif-builder", "npm:3.4.0"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:13.0.4", {\
+        "packageLocation": "../../../.yarn/berry/cache/@secretlint-secretlint-formatter-sarif-npm-13.0.4-f9a93b5013-10c0.zip/node_modules/@secretlint/secretlint-formatter-sarif/",\
+        "packageDependencies": [\
+          ["@secretlint/secretlint-formatter-sarif", "npm:13.0.4"],\
+          ["node-sarif-builder", "npm:4.1.0"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["@secretlint/secretlint-rule-no-dotenv", [\
@@ -1121,6 +1132,14 @@ const RAW_RUNTIME_STATE =
           ["@secretlint/types", "npm:10.2.2"]\
         ],\
         "linkType": "HARD"\
+      }],\
+      ["npm:13.0.4", {\
+        "packageLocation": "../../../.yarn/berry/cache/@secretlint-secretlint-rule-no-dotenv-npm-13.0.4-a2ec3cf664-10c0.zip/node_modules/@secretlint/secretlint-rule-no-dotenv/",\
+        "packageDependencies": [\
+          ["@secretlint/secretlint-rule-no-dotenv", "npm:13.0.4"],\
+          ["@secretlint/types", "npm:13.0.4"]\
+        ],\
+        "linkType": "HARD"\
       }]\
     ]],\
     ["@secretlint/secretlint-rule-preset-recommend", [\
@@ -1128,6 +1147,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/@secretlint-secretlint-rule-preset-recommend-npm-10.2.2-0b9aaeab89-10c0.zip/node_modules/@secretlint/secretlint-rule-preset-recommend/",\
         "packageDependencies": [\
           ["@secretlint/secretlint-rule-preset-recommend", "npm:10.2.2"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:13.0.4", {\
+        "packageLocation": "../../../.yarn/berry/cache/@secretlint-secretlint-rule-preset-recommend-npm-13.0.4-1df90804b5-10c0.zip/node_modules/@secretlint/secretlint-rule-preset-recommend/",\
+        "packageDependencies": [\
+          ["@secretlint/secretlint-rule-preset-recommend", "npm:13.0.4"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -1148,6 +1174,13 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/@secretlint-types-npm-10.2.2-dbab810d6f-10c0.zip/node_modules/@secretlint/types/",\
         "packageDependencies": [\
           ["@secretlint/types", "npm:10.2.2"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:13.0.4", {\
+        "packageLocation": "../../../.yarn/berry/cache/@secretlint-types-npm-13.0.4-2803a2abfd-10c0.zip/node_modules/@secretlint/types/",\
+        "packageDependencies": [\
+          ["@secretlint/types", "npm:13.0.4"]\
         ],\
         "linkType": "HARD"\
       }]\
@@ -4456,6 +4489,9 @@ const RAW_RUNTIME_STATE =
         "packageDependencies": [\
           ["kevin-log", "workspace:."],\
           ["@changesets/cli", "npm:2.31.1"],\
+          ["@secretlint/secretlint-formatter-sarif", "npm:13.0.4"],\
+          ["@secretlint/secretlint-rule-no-dotenv", "npm:13.0.4"],\
+          ["@secretlint/secretlint-rule-preset-recommend", "npm:13.0.4"],\
           ["@types/mocha", "npm:10.0.10"],\
           ["@types/node", "npm:24.13.3"],\
           ["@types/vscode", "npm:1.107.0"],\
@@ -5088,6 +5124,15 @@ const RAW_RUNTIME_STATE =
         "packageLocation": "../../../.yarn/berry/cache/node-sarif-builder-npm-3.4.0-e718fa6174-10c0.zip/node_modules/node-sarif-builder/",\
         "packageDependencies": [\
           ["node-sarif-builder", "npm:3.4.0"],\
+          ["@types/sarif", "npm:2.1.7"],\
+          ["fs-extra", "npm:11.4.0"]\
+        ],\
+        "linkType": "HARD"\
+      }],\
+      ["npm:4.1.0", {\
+        "packageLocation": "../../../.yarn/berry/cache/node-sarif-builder-npm-4.1.0-140879cbdb-10c0.zip/node_modules/node-sarif-builder/",\
+        "packageDependencies": [\
+          ["node-sarif-builder", "npm:4.1.0"],\
           ["@types/sarif", "npm:2.1.7"],\
           ["fs-extra", "npm:11.4.0"]\
         ],\
