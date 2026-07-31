@@ -56,7 +56,9 @@ function insertLogCommand() {
   }
 
   const config = vscode.workspace.getConfiguration("kevinLog");
-  const anchorLine = document.lineAt(Math.max(plan.insertLine - 1, 0));
+  const anchorLine = document.lineAt(
+    Math.max(Math.min(plan.indentLine, document.lineCount - 1), 0),
+  );
   const indent = anchorLine.text.match(/^(\s*)/)?.[1] ?? "";
 
   const logStatement = formatLogStatement(plan, document.fileName, {

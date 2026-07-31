@@ -14,6 +14,14 @@ export interface LogPlan {
   insertLine: number;
   /** 1-indexed line number the log will land on, for the file:line tag. */
   logLineNumber: number;
+  /**
+   * 0-indexed line whose leading whitespace should be copied as the
+   * indent for the inserted log line. This is usually the same line the
+   * logged declaration/statement starts on — NOT necessarily `insertLine - 1`,
+   * since a multi-line statement's last physical line (e.g. a nested `});`)
+   * can be indented more deeply than the statement itself.
+   */
+  indentLine: number;
 }
 
 export interface FormatOptions {
@@ -64,6 +72,9 @@ export function buildLogPlan(
 
     const classProp = tryClassProperty(sourceFile, token);
     if (classProp) return classProp;
+
+    const varDecl = tryVariableDeclaration(sourceFile, token);
+    if (varDecl) return varDecl;
   }
 
   // Default: plain variable / identifier case.
@@ -78,6 +89,7 @@ export function buildLogPlan(
     contextName: enclosingFunctionName,
     insertLine: cursorLine + 1,
     logLineNumber: cursorLine + 2,
+    indentLine: cursorLine,
   };
 }
 
@@ -103,6 +115,9 @@ function tryDestructuring(
     varDecl.getEnd(),
   ).line;
   const insertLine = declEndLine + 1;
+  const indentLine = sourceFile.getLineAndCharacterOfPosition(
+    varDecl.getStart(sourceFile),
+  ).line;
   const enclosingFunctionName = findEnclosingFunctionName(
     sourceFile,
     varDecl.getStart(sourceFile),
@@ -120,6 +135,7 @@ function tryDestructuring(
       contextName: enclosingFunctionName,
       insertLine,
       logLineNumber: declEndLine + 2,
+      indentLine,
     };
   }
 
@@ -130,6 +146,137 @@ function tryDestructuring(
     contextName: enclosingFunctionName,
     insertLine,
     logLineNumber: declEndLine + 2,
+    indentLine,
+  };
+}
+
+/**
+ * If the token is the name of a simple (non-destructured) variable
+ * declaration, e.g. `const x = a && f(...)`, insert the log after
+ * the *end of the full declaration/statement* rather than right after
+ * the cursor's line. This matters when the initializer spans multiple
+ * lines: logging must not land in the middle of the expression.
+ */
+function tryVariableDeclaration(
+  sourceFile: ts.SourceFile,
+  token: ts.Node,
+): LogPlan | undefined {
+  const varDecl = findAncestor(token, ts.isVariableDeclaration);
+  if (varDecl && ts.isIdentifier(varDecl.name) && varDecl.initializer) {
+    const isNameToken =
+      token.getStart(sourceFile) >= varDecl.name.getStart(sourceFile) &&
+      token.getEnd() <= varDecl.name.getEnd();
+    if (isNameToken) {
+      // Anchor on the end of the enclosing statement (covers the trailing
+      // semicolon / multi-declarator lists) so the insert point is always
+      // after the whole thing, however many lines it spans.
+      const statement =
+        findAncestor(varDecl, ts.isVariableStatement) ?? varDecl;
+      return declarationPlan(sourceFile, varDecl.name.text, varDecl, statement);
+    }
+
+    // Token is inside the initializer itself (e.g. `const canEdit =
+    // isApproved && f(...)`, cursor on `isApproved`). If the initializer
+    // spans multiple lines, inserting right after the token's own line
+    // would land the log mid-expression and break the syntax — so anchor
+    // on the end of the whole statement, same as the declaration-name
+    // case, but log the selected identifier rather than the declared name.
+    const isInInitializer =
+      token.getStart(sourceFile) >= varDecl.initializer.getStart(sourceFile) &&
+      token.getEnd() <= varDecl.initializer.getEnd();
+    if (isInInitializer && ts.isIdentifier(token)) {
+      const initStartLine = sourceFile.getLineAndCharacterOfPosition(
+        varDecl.initializer.getStart(sourceFile),
+      ).line;
+      const initEndLine = sourceFile.getLineAndCharacterOfPosition(
+        varDecl.initializer.getEnd(),
+      ).line;
+      if (initEndLine > initStartLine) {
+        const statement =
+          findAncestor(varDecl, ts.isVariableStatement) ?? varDecl;
+        return declarationPlan(
+          sourceFile,
+          token.getText(sourceFile),
+          varDecl,
+          statement,
+        );
+      }
+    }
+  }
+
+  // Same hazard applies to a plain reassignment: `x = a && f(...);`
+  // (no `const`/`let`, just an assignment expression statement).
+  const binary = findAncestor(token, ts.isBinaryExpression);
+  if (
+    binary &&
+    binary.operatorToken.kind === ts.SyntaxKind.EqualsToken &&
+    ts.isIdentifier(binary.left)
+  ) {
+    const isNameToken =
+      token.getStart(sourceFile) >= binary.left.getStart(sourceFile) &&
+      token.getEnd() <= binary.left.getEnd();
+    if (isNameToken) {
+      const statement =
+        findAncestor(binary, ts.isExpressionStatement) ?? binary;
+      return declarationPlan(sourceFile, binary.left.text, binary, statement);
+    }
+
+    const isInRhs =
+      token.getStart(sourceFile) >= binary.right.getStart(sourceFile) &&
+      token.getEnd() <= binary.right.getEnd();
+    if (isInRhs && ts.isIdentifier(token)) {
+      const rhsStartLine = sourceFile.getLineAndCharacterOfPosition(
+        binary.right.getStart(sourceFile),
+      ).line;
+      const rhsEndLine = sourceFile.getLineAndCharacterOfPosition(
+        binary.right.getEnd(),
+      ).line;
+      if (rhsEndLine > rhsStartLine) {
+        const statement =
+          findAncestor(binary, ts.isExpressionStatement) ?? binary;
+        return declarationPlan(
+          sourceFile,
+          token.getText(sourceFile),
+          binary,
+          statement,
+        );
+      }
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Build the LogPlan for a declaration/assignment-name match. `statement` is
+ * the enclosing statement whose end anchors `insertLine` (so a multi-line
+ * initializer doesn't get logged mid-expression) and whose *start* line
+ * anchors `indentLine` (so the log line copies the statement's own
+ * indentation, not that of some deeper-nested line inside its RHS).
+ */
+function declarationPlan(
+  sourceFile: ts.SourceFile,
+  name: string,
+  nameOwner: ts.Node,
+  statement: ts.Node,
+): LogPlan {
+  const declEndLine = sourceFile.getLineAndCharacterOfPosition(
+    statement.getEnd(),
+  ).line;
+  const indentLine = sourceFile.getLineAndCharacterOfPosition(
+    statement.getStart(sourceFile),
+  ).line;
+  const enclosingFunctionName = findEnclosingFunctionName(
+    sourceFile,
+    nameOwner.getStart(sourceFile),
+  );
+
+  return {
+    expressions: [name],
+    contextName: enclosingFunctionName,
+    insertLine: declEndLine + 1,
+    logLineNumber: declEndLine + 2,
+    indentLine,
   };
 }
 
@@ -184,6 +331,7 @@ function tryFunctionParameter(
     contextName: fnName,
     insertLine,
     logLineNumber: bodyStartLine + 2,
+    indentLine: bodyStartLine,
   };
 }
 
@@ -206,11 +354,15 @@ function tryClassProperty(
       const declEndLine = sourceFile.getLineAndCharacterOfPosition(
         propDecl.getEnd(),
       ).line;
+      const indentLine = sourceFile.getLineAndCharacterOfPosition(
+        propDecl.getStart(sourceFile),
+      ).line;
       return {
         expressions: [`this.${propDecl.name.text}`],
         contextName: className,
         insertLine: declEndLine + 1,
         logLineNumber: declEndLine + 2,
+        indentLine,
       };
     }
   }
@@ -223,11 +375,15 @@ function tryClassProperty(
     const line = sourceFile.getLineAndCharacterOfPosition(
       propAccess.getEnd(),
     ).line;
+    const indentLine = sourceFile.getLineAndCharacterOfPosition(
+      propAccess.getStart(sourceFile),
+    ).line;
     return {
       expressions: [propAccess.getText(sourceFile)],
       contextName: className,
       insertLine: line + 1,
       logLineNumber: line + 2,
+      indentLine,
     };
   }
 

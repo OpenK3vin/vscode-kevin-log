@@ -180,6 +180,180 @@ suite("logPlanner: buildLogPlan", () => {
     assert.strictEqual(plan!.contextName, "UserService");
   });
 
+  test("variable declaration with multi-line initializer inserts after the full statement, not after the cursor's line", () => {
+    const source = [
+      "const x =",
+      "  a &&",
+      "  f({",
+      "    p,",
+      "    q: 'r',",
+      "    s: T.U,",
+      "  });",
+    ].join("\n");
+
+    // Cursor on "x", the declaration name (line 0), not inside the multi-line initializer.
+    const offset = offsetOf(source, "x");
+    const plan = buildLogPlan(source, "test.ts", offset, "x");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["x"]);
+    // Statement spans lines 0-6 (0-indexed); log must land on line 7, after the closing ");".
+    assert.strictEqual(plan!.insertLine, 7);
+    assert.strictEqual(plan!.logLineNumber, 8);
+    // Indent must come from the declaration's own line (0), not the deeper-nested
+    // closing "});" on line 6 — otherwise the inserted log is over-indented.
+    assert.strictEqual(plan!.indentLine, 0);
+  });
+
+  test("indentLine points at the statement's own line even when the RHS is indented more deeply, so the inserted log matches the statement's indentation", () => {
+    const source = [
+      "function outer() {",
+      "  const x =",
+      "    a &&",
+      "    f({",
+      "      p,",
+      "    });",
+      "}",
+    ].join("\n");
+
+    const offset = offsetOf(source, "x =");
+    const plan = buildLogPlan(source, "test.ts", offset, "x");
+
+    assert.ok(plan);
+    // Statement spans lines 1-5 (0-indexed): "  const x =" through "    });".
+    // Log must land on line 6, right after "    });" and before the function's
+    // closing "}" on line 6 (post-insert) / line 6 (pre-insert, now pushed to 7).
+    assert.strictEqual(plan!.insertLine, 6);
+    assert.strictEqual(plan!.logLineNumber, 7);
+    // "  const x =" is line 1, indented 2 spaces. "    });" (line 5) is indented
+    // 4 spaces — if indentLine pointed there instead, the log would be over-indented.
+    assert.strictEqual(plan!.indentLine, 1);
+
+    const indent = "  ";
+    const logStatement = formatLogStatement(plan!, "test.ts", { indent });
+    assert.ok(logStatement.startsWith("  console.log"));
+
+    // Full end-to-end check: simulate the insertion and confirm the log lands
+    // between "});" and the function's closing "}", correctly indented.
+    const lines = source.split("\n");
+    const resultLines = [
+      ...lines.slice(0, plan!.insertLine),
+      logStatement.replace(/\n$/, ""),
+      ...lines.slice(plan!.insertLine),
+    ];
+    assert.deepStrictEqual(resultLines, [
+      "function outer() {",
+      "  const x =",
+      "    a &&",
+      "    f({",
+      "      p,",
+      "    });",
+      "  console.log('🚀 ~ test.ts:7 ~ outer ~ x:', x);",
+      "}",
+    ]);
+  });
+
+  test("variable declaration with single-line initializer still inserts right after that line", () => {
+    const source = "const x = 1;\nconst y = 2;";
+    const offset = offsetOf(source, "x");
+    const plan = buildLogPlan(source, "test.ts", offset, "x");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["x"]);
+    assert.strictEqual(plan!.insertLine, 1);
+  });
+
+  test("selecting an identifier inside the initializer (not the declaration name) logs that identifier, not the declared variable", () => {
+    const source = ["const x =", "  a &&", "  f({ q: 'r' });"].join("\n");
+
+    // Cursor on "a" inside the initializer.
+    const offset = offsetOf(source, "a &&");
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+  });
+
+  test("identifier used inside a multi-line initializer (not the declaration name) anchors on the end of the statement", () => {
+    const source = [
+      "function outer() {",
+      "  const x =",
+      "    a &&",
+      "    f({",
+      "      p,",
+      "    });",
+      "}",
+    ].join("\n");
+
+    const offset = offsetOf(source, "a &&");
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+    // Statement spans lines 1-5 (0-indexed); log must land on line 6,
+    // right after "    });" and before the function's closing "}".
+    assert.strictEqual(plan!.insertLine, 6);
+    assert.strictEqual(plan!.logLineNumber, 7);
+    // Indent comes from "  const x =" (line 1), not the deeper-nested RHS.
+    assert.strictEqual(plan!.indentLine, 1);
+  });
+
+  test("plain reassignment with a multi-line RHS inserts after the full statement, same as a declaration", () => {
+    const source = [
+      "function f() {",
+      "  let x;",
+      "  x =",
+      "    a &&",
+      "    g();",
+      "}",
+    ].join("\n");
+
+    const offset = offsetOf(source, "x =");
+    const plan = buildLogPlan(source, "test.ts", offset, "x");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["x"]);
+    // Assignment spans lines 2-4 (0-indexed); log lands on line 5, after the closing ");".
+    assert.strictEqual(plan!.insertLine, 5);
+    // Indent should come from "  x =" (line 2), not the deeper-nested RHS.
+    assert.strictEqual(plan!.indentLine, 2);
+  });
+
+  test("multi-declarator statement anchors on the end of the whole statement, not just the selected declarator", () => {
+    const source = ["const w = 1, x =", "  a &&", "  f();"].join("\n");
+
+    const offset = offsetOf(source, "x =");
+    const plan = buildLogPlan(source, "test.ts", offset, "x");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["x"]);
+    assert.strictEqual(plan!.insertLine, 3);
+    assert.strictEqual(plan!.indentLine, 0);
+  });
+
+  test("a multi-line if-condition reference logs right after the reference, not after the entire if-block", () => {
+    // Regression guard: only a declaration/assignment name should anchor on
+    // the whole statement. A plain mid-expression reference has no ordering
+    // hazard, so it should keep the original cursor-line behavior.
+    const source = [
+      "function check() {",
+      "  if (",
+      "    a &&",
+      "    b",
+      "  ) {",
+      "    return true;",
+      "  }",
+      "}",
+    ].join("\n");
+
+    const offset = offsetOf(source, "a &&");
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+    assert.strictEqual(plan!.insertLine, 3); // right after "a &&", not after the whole if-block
+  });
+
   test("returns undefined when there is no token and no selected text", () => {
     const plan = buildLogPlan("", "test.ts", 0, undefined);
     assert.strictEqual(plan, undefined);
@@ -202,6 +376,7 @@ suite("logPlanner: formatLogStatement", () => {
     contextName: "calculateTotal",
     insertLine: 2,
     logLineNumber: 4,
+    indentLine: 1,
   };
 
   test("default options produce marker, file:line, context, single-quotes, semicolon", () => {
@@ -379,6 +554,7 @@ suite("logPlanner: formatLogStatement marker option", () => {
       expressions: ["x"],
       insertLine: 0,
       logLineNumber: 1,
+      indentLine: 0,
     };
     const result = formatLogStatement(plan, "test.ts");
     assert.ok(result.includes(DEFAULT_MARKER));
@@ -389,6 +565,7 @@ suite("logPlanner: formatLogStatement marker option", () => {
       expressions: ["x"],
       insertLine: 0,
       logLineNumber: 1,
+      indentLine: 0,
     };
     const result = formatLogStatement(plan, "test.ts", { marker: "🐛" });
     assert.ok(result.includes("🐛"));
@@ -400,6 +577,7 @@ suite("logPlanner: formatLogStatement marker option", () => {
       expressions: ["x"],
       insertLine: 0,
       logLineNumber: 1,
+      indentLine: 0,
     };
     const result = formatLogStatement(plan, "test.ts", { marker: "DEBUG:" });
     assert.ok(result.includes("DEBUG:"));
@@ -410,6 +588,7 @@ suite("logPlanner: formatLogStatement marker option", () => {
       expressions: ["x"],
       insertLine: 0,
       logLineNumber: 1,
+      indentLine: 0,
     };
     const result = formatLogStatement(plan, "test.ts", {
       marker: "🐛",
