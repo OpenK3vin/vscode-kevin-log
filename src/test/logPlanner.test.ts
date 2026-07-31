@@ -363,7 +363,7 @@ suite("logPlanner: buildLogPlan", () => {
     const aOffset = offsetOf(source, "a =");
     const aPlan = buildLogPlan(source, "test.ts", aOffset, "a");
     assert.ok(aPlan);
-    assert.strictEqual(aPlan!.insertLine, 4);
+    assert.strictEqual(aPlan!.insertLine, 5);
 
     const lines = source.split("\n");
     const afterA = [
@@ -373,12 +373,12 @@ suite("logPlanner: buildLogPlan", () => {
     ].join("\n");
 
     // Second call: log "b". Without the fix this would also compute
-    // insertLine 4, landing ABOVE the "a" log just inserted.
+    // insertLine 5, landing ABOVE the "a" log just inserted.
     const bOffset = offsetOf(afterA, "b &&");
     const bPlan = buildLogPlan(afterA, "test.ts", bOffset, "b");
     assert.ok(bPlan);
     // Should skip past the already-inserted "a" log and land right below it.
-    assert.strictEqual(bPlan!.insertLine, 5);
+    assert.strictEqual(bPlan!.insertLine, 6);
 
     const afterB = [
       ...afterA.split("\n").slice(0, bPlan!.insertLine),
@@ -390,7 +390,7 @@ suite("logPlanner: buildLogPlan", () => {
     const cOffset = offsetOf(afterB, "c({");
     const cPlan = buildLogPlan(afterB, "test.ts", cOffset, "c");
     assert.ok(cPlan);
-    assert.strictEqual(cPlan!.insertLine, 6);
+    assert.strictEqual(cPlan!.insertLine, 7);
 
     const finalLines = [
       ...afterB.split("\n").slice(0, cPlan!.insertLine),
