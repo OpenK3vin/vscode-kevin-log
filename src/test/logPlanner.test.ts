@@ -354,6 +354,63 @@ suite("logPlanner: buildLogPlan", () => {
     assert.strictEqual(plan!.insertLine, 3); // right after "a &&", not after the whole if-block
   });
 
+  test("subsequent calls on the same statement stack new logs below existing ones, in insertion order", () => {
+    const source = ["const a =", "  b &&", "  c({", "    x,", "  });"].join(
+      "\n",
+    );
+
+    // First call: log "a" (the declaration name).
+    const aOffset = offsetOf(source, "a =");
+    const aPlan = buildLogPlan(source, "test.ts", aOffset, "a");
+    assert.ok(aPlan);
+    assert.strictEqual(aPlan!.insertLine, 4);
+
+    const lines = source.split("\n");
+    const afterA = [
+      ...lines.slice(0, aPlan!.insertLine),
+      `console.log('${DEFAULT_MARKER} a:', a);`,
+      ...lines.slice(aPlan!.insertLine),
+    ].join("\n");
+
+    // Second call: log "b". Without the fix this would also compute
+    // insertLine 4, landing ABOVE the "a" log just inserted.
+    const bOffset = offsetOf(afterA, "b &&");
+    const bPlan = buildLogPlan(afterA, "test.ts", bOffset, "b");
+    assert.ok(bPlan);
+    // Should skip past the already-inserted "a" log and land right below it.
+    assert.strictEqual(bPlan!.insertLine, 5);
+
+    const afterB = [
+      ...afterA.split("\n").slice(0, bPlan!.insertLine),
+      `console.log('${DEFAULT_MARKER} b:', b);`,
+      ...afterA.split("\n").slice(bPlan!.insertLine),
+    ].join("\n");
+
+    // Third call: log "c". Should stack below both prior logs.
+    const cOffset = offsetOf(afterB, "c({");
+    const cPlan = buildLogPlan(afterB, "test.ts", cOffset, "c");
+    assert.ok(cPlan);
+    assert.strictEqual(cPlan!.insertLine, 6);
+
+    const finalLines = [
+      ...afterB.split("\n").slice(0, cPlan!.insertLine),
+      `console.log('${DEFAULT_MARKER} c:', c);`,
+      ...afterB.split("\n").slice(cPlan!.insertLine),
+    ];
+
+    // Final order: a, b, c — insertion order, not reversed.
+    assert.deepStrictEqual(finalLines, [
+      "const a =",
+      "  b &&",
+      "  c({",
+      "    x,",
+      "  });",
+      `console.log('${DEFAULT_MARKER} a:', a);`,
+      `console.log('${DEFAULT_MARKER} b:', b);`,
+      `console.log('${DEFAULT_MARKER} c:', c);`,
+    ]);
+  });
+
   test("returns undefined when there is no token and no selected text", () => {
     const plan = buildLogPlan("", "test.ts", 0, undefined);
     assert.strictEqual(plan, undefined);

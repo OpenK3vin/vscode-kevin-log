@@ -44,18 +44,23 @@ function insertLogCommand() {
     if (wordRange) selectedText = document.getText(wordRange);
   }
 
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+
   const plan = buildLogPlan(
     sourceText,
     document.fileName,
     offset,
     selectedText,
+    // Also match DEFAULT_MARKER so logs inserted before a custom marker
+    // was configured are still recognized and stacked below correctly.
+    [marker, DEFAULT_MARKER],
   );
   if (!plan) {
     vscode.window.showWarningMessage("No variable selected or under cursor.");
     return;
   }
 
-  const config = vscode.workspace.getConfiguration("kevinLog");
   const anchorLine = document.lineAt(
     Math.max(Math.min(plan.indentLine, document.lineCount - 1), 0),
   );

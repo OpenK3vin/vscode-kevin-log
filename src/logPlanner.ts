@@ -48,6 +48,7 @@ export function buildLogPlan(
   fileName: string,
   offset: number,
   selectedText?: string,
+  markers: string | string[] = DEFAULT_MARKER,
 ): LogPlan | undefined {
   const sourceFile = ts.createSourceFile(
     fileName,
@@ -63,33 +64,72 @@ export function buildLogPlan(
 
   if (!fallbackName) return undefined;
 
+  let plan: LogPlan | undefined;
+
   if (token) {
-    const destructuring = tryDestructuring(sourceFile, token);
-    if (destructuring) return destructuring;
-
-    const param = tryFunctionParameter(sourceFile, token);
-    if (param) return param;
-
-    const classProp = tryClassProperty(sourceFile, token);
-    if (classProp) return classProp;
-
-    const varDecl = tryVariableDeclaration(sourceFile, token);
-    if (varDecl) return varDecl;
+    plan =
+      tryDestructuring(sourceFile, token) ??
+      tryFunctionParameter(sourceFile, token) ??
+      tryClassProperty(sourceFile, token) ??
+      tryVariableDeclaration(sourceFile, token);
   }
 
-  // Default: plain variable / identifier case.
-  const enclosingFunctionName = token
-    ? findEnclosingFunctionName(sourceFile, token.getStart(sourceFile))
-    : undefined;
+  if (!plan) {
+    // Default: plain variable / identifier case.
+    const enclosingFunctionName = token
+      ? findEnclosingFunctionName(sourceFile, token.getStart(sourceFile))
+      : undefined;
 
-  const cursorLine = sourceFile.getLineAndCharacterOfPosition(offset).line;
+    const cursorLine = sourceFile.getLineAndCharacterOfPosition(offset).line;
+
+    plan = {
+      expressions: [fallbackName],
+      contextName: enclosingFunctionName,
+      insertLine: cursorLine + 1,
+      logLineNumber: cursorLine + 2,
+      indentLine: cursorLine,
+    };
+  }
+
+  return skipExistingLogLines(sourceText, plan, markers);
+}
+
+/**
+ * If the computed insert point is immediately followed by one or more
+ * already-inserted marked log lines (e.g. from prior invocations targeting
+ * the same statement), advance past them. Otherwise every new log for that
+ * statement would land at the same fixed point and push earlier ones down,
+ * stacking them in reverse order. Skipping forward makes new logs append
+ * below existing ones, in the order they were added.
+ */
+function skipExistingLogLines(
+  sourceText: string,
+  plan: LogPlan,
+  markers: string | string[],
+): LogPlan {
+  const markerList = (Array.isArray(markers) ? markers : [markers]).filter(
+    (m) => m.length > 0,
+  );
+  if (markerList.length === 0) return plan;
+
+  const lines = sourceText.split(/\r\n|\r|\n/);
+  let insertLine = plan.insertLine;
+  let skipped = 0;
+
+  while (
+    insertLine < lines.length &&
+    markerList.some((m) => lines[insertLine].includes(m))
+  ) {
+    insertLine++;
+    skipped++;
+  }
+
+  if (skipped === 0) return plan;
 
   return {
-    expressions: [fallbackName],
-    contextName: enclosingFunctionName,
-    insertLine: cursorLine + 1,
-    logLineNumber: cursorLine + 2,
-    indentLine: cursorLine,
+    ...plan,
+    insertLine,
+    logLineNumber: plan.logLineNumber + skipped,
   };
 }
 
