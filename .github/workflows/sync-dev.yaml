@@ -11,16 +11,26 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     steps:
+      - name: Generate App token
+        id: app-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ secrets.OPENK3VIN_APP_RELEASER_ID }}
+          private-key: ${{ secrets.OPENK3VIN_APP_PRIVATE_KEY }}
+
       - name: Checkout dev
         uses: actions/checkout@v4
         with:
           ref: dev
           fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token }}
 
       - name: Merge main into dev
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "vscode-kevin-log-releaser[bot]"
+          git config user.email "vscode-kevin-log-releaser[bot]@users.noreply.github.com"
           git fetch origin main
           git merge origin/main --no-edit
           git push origin dev
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
