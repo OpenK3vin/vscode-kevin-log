@@ -42,8 +42,8 @@ jobs:
         id: changesets
         uses: changesets/action@v1
         with:
-          version: yarn install --immutable && yarn run version
-          publish: yarn install --immutable && yarn release
+          version: bash -c "yarn install --immutable && yarn run version"
+          publish: bash -c "yarn install --immutable && yarn release"
           commit: "chore: version packages"
           title: "chore: version packages"
         env:
