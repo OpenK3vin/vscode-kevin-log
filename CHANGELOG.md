@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.2.0
+
+### Minor Changes
+
+- 28c09ee: Add configurable log markers via the `kevinLog.marker` setting, and document the new setting in the README.
+
+### Patch Changes
+
+- fb36bdd: Ensure yarn dependencies are installed before running versioning and release commands in release workflow.
+- 2899c55: Fix log planner to ensure consecutive logs are stacked in order and update Yarn PnP package paths.
+- 552474c: Setup Yarn VSCode SDKs for TypeScript resolution and configure .gitignore for Yarn Berry artifacts.
+- 8483fb8: Add `docs/github-conventions.md` documenting the repo's branching model, PR conventions, branch protection rules, and GitHub Actions workflow behaviour (CI, release, and sync).
+- d355ae7: Ignore and remove tracked Yarn PnP generated files to clean up the repository.
+- 3695306: Add GitHub branch ruleset configuration for main and dev branch protection.
+- a628398: Update generate-pr skill to scope dev-to-main PRs to only new changes since the last main-to-dev sync.
+- c50d19c: Update sync-dev GitHub Actions workflow to use GitHub App token authentication for branch protection bypass.
+- 110bdc7: Wrap changesets action version and publish commands in bash subshell for chaining support.
+- 5135df4: Expanded the OSS project setup checklist with additional troubleshooting tips for bot permissions, PnP packaging errors, and artifact size management.
+- 88b953d: Update log planner tests to comprehensively cover indentation, line numbering, and context name resolution for multi-line statements.
+
 ## 0.1.2
 
 ### Patch Changes
