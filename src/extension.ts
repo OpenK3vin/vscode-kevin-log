@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 import {
-  MARKER,
+  DEFAULT_MARKER,
   buildLogPlan,
   formatLogStatement,
   findMarkedLogLines,
@@ -44,19 +44,26 @@ function insertLogCommand() {
     if (wordRange) selectedText = document.getText(wordRange);
   }
 
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+
   const plan = buildLogPlan(
     sourceText,
     document.fileName,
     offset,
     selectedText,
+    // Also match DEFAULT_MARKER so logs inserted before a custom marker
+    // was configured are still recognized and stacked below correctly.
+    [marker, DEFAULT_MARKER],
   );
   if (!plan) {
     vscode.window.showWarningMessage("No variable selected or under cursor.");
     return;
   }
 
-  const config = vscode.workspace.getConfiguration("kevinLog");
-  const anchorLine = document.lineAt(Math.max(plan.insertLine - 1, 0));
+  const anchorLine = document.lineAt(
+    Math.max(Math.min(plan.indentLine, document.lineCount - 1), 0),
+  );
   const indent = anchorLine.text.match(/^(\s*)/)?.[1] ?? "";
 
   const logStatement = formatLogStatement(plan, document.fileName, {
@@ -64,6 +71,7 @@ function insertLogCommand() {
     logFunction: config.get<string>("logFunction", "console.log"),
     includeFileAndLine: config.get<boolean>("includeFileAndLine", true),
     includeMarker: config.get<boolean>("includeMarker", true),
+    marker: config.get<string>("marker", DEFAULT_MARKER),
     semicolons: config.get<boolean>("semicolons", true),
     indent,
   });
@@ -93,7 +101,12 @@ function deleteAllLogsCommand() {
   if (!editor) return;
 
   const document = editor.document;
-  const linesToDelete = findMarkedLogLines(document.getText());
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+  const linesToDelete = findMarkedLogLines(document.getText(), [
+    marker,
+    DEFAULT_MARKER,
+  ]);
 
   if (linesToDelete.length === 0) {
     vscode.window.showInformationMessage(
@@ -119,7 +132,12 @@ function commentAllLogsCommand() {
   if (!editor) return;
 
   const document = editor.document;
-  const lineNumbers = findMarkedLogLines(document.getText());
+  const config = vscode.workspace.getConfiguration("kevinLog");
+  const marker = config.get<string>("marker", DEFAULT_MARKER);
+  const lineNumbers = findMarkedLogLines(document.getText(), [
+    marker,
+    DEFAULT_MARKER,
+  ]);
 
   if (lineNumbers.length === 0) {
     vscode.window.showInformationMessage(
