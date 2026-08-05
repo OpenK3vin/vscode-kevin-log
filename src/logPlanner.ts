@@ -71,7 +71,8 @@ export function buildLogPlan(
       tryDestructuring(sourceFile, token) ??
       tryFunctionParameter(sourceFile, token) ??
       tryClassProperty(sourceFile, token) ??
-      tryVariableDeclaration(sourceFile, token);
+      tryVariableDeclaration(sourceFile, token) ??
+      tryIfConditionReference(sourceFile, token);
   }
 
   if (!plan) {
@@ -221,10 +222,19 @@ function tryVariableDeclaration(
     // would land the log mid-expression and break the syntax — so anchor
     // on the end of the whole statement, same as the declaration-name
     // case, but log the selected identifier rather than the declared name.
+    //
+    // This must NOT fire when the token is nested inside a function body
+    // that itself lives inside the initializer (e.g. `const action =
+    // client.action(async () => { ... if (isAllowed) ... })`) — there,
+    // `isAllowed` belongs to its own enclosing statement (the `if`) deep
+    // inside the callback, not to the outer `action` declaration, however
+    // far up the AST that declaration happens to sit. Bail out if any
+    // function body boundary sits between the token and the declaration.
     const isInInitializer =
       token.getStart(sourceFile) >= varDecl.initializer.getStart(sourceFile) &&
       token.getEnd() <= varDecl.initializer.getEnd();
-    if (isInInitializer && ts.isIdentifier(token)) {
+    const crossesFunctionBoundary = hasInterveningFunctionBody(token, varDecl);
+    if (isInInitializer && !crossesFunctionBoundary && ts.isIdentifier(token)) {
       const initStartLine = sourceFile.getLineAndCharacterOfPosition(
         varDecl.initializer.getStart(sourceFile),
       ).line;
@@ -264,7 +274,8 @@ function tryVariableDeclaration(
     const isInRhs =
       token.getStart(sourceFile) >= binary.right.getStart(sourceFile) &&
       token.getEnd() <= binary.right.getEnd();
-    if (isInRhs && ts.isIdentifier(token)) {
+    const crossesFunctionBoundary = hasInterveningFunctionBody(token, binary);
+    if (isInRhs && !crossesFunctionBoundary && ts.isIdentifier(token)) {
       const rhsStartLine = sourceFile.getLineAndCharacterOfPosition(
         binary.right.getStart(sourceFile),
       ).line;
@@ -316,6 +327,73 @@ function declarationPlan(
     contextName: enclosingFunctionName,
     insertLine: declEndLine + 1,
     logLineNumber: declEndLine + 2,
+    indentLine,
+  };
+}
+
+/**
+ * If the token is a plain identifier reference inside an `if` condition
+ * (e.g. `if (!isAllowed || !isOwner) { ... }`, cursor on `isAllowed`), and
+ * the condition is written on the same line as the block's opening `{`,
+ * the default fallback plan would insert the log right after that line
+ * but copy *that line's* indentation — landing the log inside the block
+ * but indented as shallow as the `if` itself, one level short of the
+ * block's own statements.
+ *
+ * When the block has at least one statement, anchor the indent on that
+ * first statement's line instead, so the inserted log matches the
+ * indentation of the code it sits alongside.
+ */
+/**
+ * If the token is a plain identifier reference inside an `if` condition
+ * (e.g. `if (!a || !b) { ... }` or a multi-line `if (a && b) { ... }`),
+ * always insert the log inside the block, anchored on the block's first
+ * statement — never mid-condition.
+ *
+ * The generic fallback plan this replaces just inserts "right after the
+ * token's own line." For a single-line condition that accidentally still
+ * lands inside the block, but with the wrong (too-shallow) indentation.
+ * For a multi-line condition it is actively broken: inserting a statement
+ * between two lines of a parenthesized expression produces invalid syntax
+ * (e.g. splitting `if (\n  a &&\n  b\n)` by putting a `console.log(...)`
+ * between `a &&` and `b`). Anchoring on the block's first statement avoids
+ * both problems, regardless of how many lines the condition spans.
+ */
+function tryIfConditionReference(
+  sourceFile: ts.SourceFile,
+  token: ts.Node,
+): LogPlan | undefined {
+  if (!ts.isIdentifier(token)) return undefined;
+
+  const ifStatement = findAncestor(token, ts.isIfStatement);
+  if (!ifStatement) return undefined;
+
+  const isInCondition =
+    token.getStart(sourceFile) >= ifStatement.expression.getStart(sourceFile) &&
+    token.getEnd() <= ifStatement.expression.getEnd();
+  if (!isInCondition) return undefined;
+
+  const thenBlock = ifStatement.thenStatement;
+  if (!ts.isBlock(thenBlock) || thenBlock.statements.length === 0) {
+    return undefined;
+  }
+
+  const firstStatement = thenBlock.statements[0];
+  const indentLine = sourceFile.getLineAndCharacterOfPosition(
+    firstStatement.getStart(sourceFile),
+  ).line;
+  const insertLine = indentLine;
+
+  const enclosingFunctionName = findEnclosingFunctionName(
+    sourceFile,
+    token.getStart(sourceFile),
+  );
+
+  return {
+    expressions: [token.getText(sourceFile)],
+    contextName: enclosingFunctionName,
+    insertLine,
+    logLineNumber: insertLine + 1,
     indentLine,
   };
 }
@@ -508,6 +586,34 @@ function findAncestor<T extends ts.Node>(
     current = current.parent;
   }
   return undefined;
+}
+
+/**
+ * True if a function body (arrow function, function expression, function
+ * declaration, or method) sits strictly between `token` and `ancestor` in
+ * the AST. Used to stop a `findAncestor` match from reaching past a nested
+ * callback into an outer statement it isn't really part of — e.g. inside
+ * `client.action(async () => { if (isAllowed) ... })`, `isAllowed` sits
+ * inside the callback's own body, so it shouldn't be treated as "inside
+ * the initializer" of the outer `const action = client.action(...)`.
+ */
+function hasInterveningFunctionBody(
+  token: ts.Node,
+  ancestor: ts.Node,
+): boolean {
+  let current: ts.Node | undefined = token.parent;
+  while (current && current !== ancestor) {
+    if (
+      ts.isFunctionDeclaration(current) ||
+      ts.isFunctionExpression(current) ||
+      ts.isArrowFunction(current) ||
+      ts.isMethodDeclaration(current)
+    ) {
+      return true;
+    }
+    current = current.parent;
+  }
+  return false;
 }
 
 /** Find the deepest AST node containing the given offset. */

@@ -684,10 +684,13 @@ suite("logPlanner: buildLogPlan", () => {
     );
   });
 
-  test("a multi-line if-condition reference logs right after the reference, not after the entire if-block", () => {
-    // Regression guard: only a declaration/assignment name should anchor on
-    // the whole statement. A plain mid-expression reference has no ordering
-    // hazard, so it should keep the original cursor-line behavior.
+  test("a multi-line if-condition reference logs inside the block, not mid-condition", () => {
+    // Regression guard: a reference inside an if-condition must never be
+    // logged by inserting a statement between the condition's own lines —
+    // `if (\n  a &&\n  console.log(...);\n  b\n) {` is invalid syntax,
+    // since a statement can't sit inside a parenthesized expression. The
+    // log must land inside the block instead, anchored on the block's
+    // first statement, however many lines the condition itself spans.
     const source = [
       "function check() {",
       "  if (",
@@ -704,9 +707,8 @@ suite("logPlanner: buildLogPlan", () => {
 
     assert.ok(plan);
     assert.deepStrictEqual(plan!.expressions, ["a"]);
-    assert.strictEqual(plan!.insertLine, 3); // right after "a &&", not after the whole if-block
-    // Enclosing function "check" is still resolved for the context segment
-    // (this uses the default fallback plan, which also resolves context).
+    assert.strictEqual(plan!.insertLine, 5); // inside the block, before "return true;"
+    assert.strictEqual(plan!.indentLine, 5); // matches the block's own indentation
     assert.strictEqual(plan!.contextName, "check");
 
     const indent = source.split("\n")[plan!.indentLine].match(/^(\s*)/)![1];
@@ -724,12 +726,161 @@ suite("logPlanner: buildLogPlan", () => {
         "function check() {",
         "  if (",
         "    a &&",
-        `    console.log('${DEFAULT_MARKER} ~ test.ts:4 ~ check ~ a:', a);`,
         "    b",
         "  ) {",
+        `    console.log('${DEFAULT_MARKER} ~ test.ts:6 ~ check ~ a:', a);`,
         "    return true;",
         "  }",
         "}",
+      ],
+    );
+  });
+
+  test("a single-line if-condition reference logs inside the block, indented to match the block's own statements", () => {
+    // Regression guard: the default fallback plan used to copy the `if`
+    // line's own (shallower) indentation even though the log lands inside
+    // the block. It should instead match the indentation of the block's
+    // first statement.
+    const source = [
+      "function f() {",
+      "  const a = true;",
+      "  if (!a) {",
+      "    return false;",
+      "  }",
+      "}",
+    ].join("\n");
+
+    // Offset at the end of "a", right before ")" (as a real cursor/word
+    // selection would land), not at its exact start boundary — right at
+    // the boundary next to "!" is a separate, pre-existing ambiguity in
+    // findTokenAtOffset unrelated to this fix.
+    const offset = offsetOf(source, "a) {") + 1;
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+    assert.strictEqual(plan!.insertLine, 3); // right after "if (!a) {"
+    assert.strictEqual(plan!.indentLine, 3); // matches "return false;", not the shallower "if" line
+    assert.strictEqual(plan!.contextName, "f");
+
+    const indent = source.split("\n")[plan!.indentLine].match(/^(\s*)/)![1];
+    const logStatement = formatLogStatement(plan!, "test.ts", {
+      indent,
+    }).replace(/\n$/, "");
+    const lines = source.split("\n");
+    assert.deepStrictEqual(
+      [
+        ...lines.slice(0, plan!.insertLine),
+        logStatement,
+        ...lines.slice(plan!.insertLine),
+      ],
+      [
+        "function f() {",
+        "  const a = true;",
+        "  if (!a) {",
+        `    console.log('${DEFAULT_MARKER} ~ test.ts:4 ~ f ~ a:', a);`,
+        "    return false;",
+        "  }",
+        "}",
+      ],
+    );
+  });
+
+  test("a single-line if with multiple conditions and multiple block statements still anchors on the block's first statement", () => {
+    const source = [
+      "async function g() {",
+      "  const a = check();",
+      "  const b = true;",
+      "  const c = true;",
+      "  if (!a || !b || !c) {",
+      "    return { successful: false };",
+      "  }",
+      "}",
+    ].join("\n");
+
+    const offset = offsetOf(source, "a || !b") + 1;
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+    assert.strictEqual(plan!.insertLine, 5);
+    assert.strictEqual(plan!.indentLine, 5);
+    assert.strictEqual(plan!.contextName, "g");
+
+    const indent = source.split("\n")[plan!.indentLine].match(/^(\s*)/)![1];
+    const logStatement = formatLogStatement(plan!, "test.ts", {
+      indent,
+    }).replace(/\n$/, "");
+    const lines = source.split("\n");
+    assert.deepStrictEqual(
+      [
+        ...lines.slice(0, plan!.insertLine),
+        logStatement,
+        ...lines.slice(plan!.insertLine),
+      ],
+      [
+        "async function g() {",
+        "  const a = check();",
+        "  const b = true;",
+        "  const c = true;",
+        "  if (!a || !b || !c) {",
+        `    console.log('${DEFAULT_MARKER} ~ test.ts:6 ~ g ~ a:', a);`,
+        "    return { successful: false };",
+        "  }",
+        "}",
+      ],
+    );
+  });
+
+  test("a reference inside an if-condition nested deep in an unrelated outer variable declaration's callback does not anchor on that outer declaration", () => {
+    // Regression guard: findAncestor(token, isVariableDeclaration) can walk
+    // arbitrarily far up past function-body boundaries. Without a guard,
+    // `a` here would be treated as "inside the initializer" of the
+    // *outer* `const x = client.method(async () => { ... })`
+    // declaration, anchoring the log at the very end of that statement
+    // instead of inside the `if` block where it's actually used.
+    const source = [
+      "const x = client",
+      "  .method(",
+      "    async () => {",
+      "      const a = check();",
+      "      if (!a) {",
+      "        return false;",
+      "      }",
+      "    },",
+      "  );",
+    ].join("\n");
+
+    const offset = offsetOf(source, "a) {") + 1;
+    const plan = buildLogPlan(source, "test.ts", offset, "a");
+
+    assert.ok(plan);
+    assert.deepStrictEqual(plan!.expressions, ["a"]);
+    assert.strictEqual(plan!.insertLine, 5); // inside the if-block, not at the end of the outer statement
+    assert.strictEqual(plan!.indentLine, 5);
+
+    const indent = source.split("\n")[plan!.indentLine].match(/^(\s*)/)![1];
+    const logStatement = formatLogStatement(plan!, "test.ts", {
+      indent,
+    }).replace(/\n$/, "");
+    const lines = source.split("\n");
+    assert.deepStrictEqual(
+      [
+        ...lines.slice(0, plan!.insertLine),
+        logStatement,
+        ...lines.slice(plan!.insertLine),
+      ],
+      [
+        "const x = client",
+        "  .method(",
+        "    async () => {",
+        "      const a = check();",
+        "      if (!a) {",
+        `        console.log('${DEFAULT_MARKER} ~ test.ts:6 ~ a:', a);`,
+        "        return false;",
+        "      }",
+        "    },",
+        "  );",
       ],
     );
   });
