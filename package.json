@@ -2,7 +2,7 @@
   "name": "kevin-log",
   "displayName": "kevin-log",
   "description": "log your variables with ease",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "publisher": "open-k3vin",
   "icon": "public/logo.png",
   "license": "MIT",

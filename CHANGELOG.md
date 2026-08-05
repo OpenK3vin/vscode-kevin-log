@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.1
+
+### Patch Changes
+
+- ca33114: fix: log planner anchors references inside if-conditions correctly to the start of the block
+
 ## 0.2.0
 
 ### Minor Changes
